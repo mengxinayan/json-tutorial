@@ -113,7 +113,6 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                     case 'r':   PUTC(c, '\r');  break;
                     case 't':   PUTC(c, '\t');  break;
                     default:
-                        /* Why c->top = head? */
                         c->top = head;
                         return LEPT_PARSE_INVALID_STRING_ESCAPE;
                 }

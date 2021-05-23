@@ -87,7 +87,7 @@ assert(x++ == 0); /* 这是错误的! */
 
 因为在做第 1 个练习题时，我希望能 100% 通过测试，方便做重构。另外，使用 `#if 0 ... #endif` 而不使用 `/* ... */`，是因为 C 的注释不支持嵌套（nested），而 `#if ... #endif` 是支持嵌套的。代码中已有注释时，用 #`if 0 ... #endif` 去禁用代码是一个常用技巧，而且可以把 `0` 改为 `1` 去恢复。
 
-### 习题记录
+### 习题回顾
 
 #### 1. 重构合并
 
@@ -99,11 +99,117 @@ assert(x++ == 0); /* 这是错误的! */
 
 把它分为四个部分（负号、整数、小数、指数），分别进行判断。
 
+#### 3. 数字过大的处理
+
+```
+1. errno == ERANGE
+2. v->n == HUGE_VAL
+```
+
+两种方法都可以进行判断
+
 ## Tutorial 03
 
 ### 注释的写法
 
 `/* \TODO */`
+
+### 结构体设计
+
+然而我们知道，一个值不可能同时为数字和字符串，因此我们可使用 C 语言的 union 来节省内存：
+
+```c
+typedef struct {
+    union {
+        struct { char* s; size_t len; }s;  /* string */
+        double n;                          /* number */
+    }u;
+    lept_type type;
+}lept_value;
+```
+
+### 动态堆栈
+
+```c
+typedef struct {
+    const char* json;
+    char* stack;
+    size_t size, top;
+}lept_context;
+```
+
+当中 size 是当前的堆栈容量，top 是栈顶的位置（由于我们会扩展 stack，所以不要把 top 用指针形式存储）。
+
+然后，我们在创建 lept_context 的时候初始化 stack 并最终释放内存。在释放时，加入了断言确保所有数据都被弹出。
+
+然后，我们实现堆栈的压入及弹出操作。和普通的堆栈不一样，我们这个堆栈是以字节储存的。每次可要求压入任意大小的数据，它会返回数据起始的指针：
+
+```c
+#ifndef LEPT_PARSE_STACK_INIT_SIZE
+#define LEPT_PARSE_STACK_INIT_SIZE 256
+#endif
+
+static void* lept_context_push(lept_context* c, size_t size) {
+    void* ret;
+    assert(size > 0);
+    if (c->top + size >= c->size) {
+        if (c->size == 0)
+            c->size = LEPT_PARSE_STACK_INIT_SIZE;
+        while (c->top + size >= c->size)
+            c->size += c->size >> 1;  /* c->size * 1.5 */
+        c->stack = (char*)realloc(c->stack, c->size);
+    }
+    ret = c->stack + c->top;
+    c->top += size;
+    return ret;
+}
+
+static void* lept_context_pop(lept_context* c, size_t size) {
+    assert(c->top >= size);
+    return c->stack + (c->top -= size);
+}
+```
+
+注意到这里使用了 `realloc()` 来重新分配内存，`c->stack` 在初始化时为 `NULL`，`realloc(NULL, size)` 的行为是等价于 `malloc(size)` 的，所以我们不需要为第一次分配内存作特别处理。
+
+另外，我们把初始大小以宏 `LEPT_PARSE_STACK_INIT_SIZE` 的形式定义，使用 `#ifndef X #define X ... #endif` 方式的好处是，使用者可在编译选项中自行设置宏，没设置的话就用缺省值。
+
+### Linux/OSX 下的内存泄漏检测方法（valgrind）
+
+可以发现内存泄漏的地方、未初始化的变量，使用下面的命令：
+
+```shell
+$ valgrind --leak-check=full  ./leptjson_test
+```
+
+编写单元测试时，应考虑哪些执行次序会有机会出错，例如内存相关的错误。然后我们可以利用 TDD 的步骤，先令测试失败（以内存工具检测），修正代码，再确认测试是否成功。
+
+### PUTC 函数
+
+```c
+#define PUTC(c, ch)         do { *(char*)lept_context_push(c, sizeof(char)) = (ch); } while(0)
+
+static void* lept_context_push(lept_context* c, size_t size) {
+    void* ret;
+    assert(size > 0);
+    if (c->top + size >= c->size) {
+        if (c->size == 0)
+            c->size = LEPT_PARSE_STACK_INIT_SIZE;
+        while (c->top + size >= c->size)
+            c->size += c->size >> 1;  /* c->size * 1.5 */
+        c->stack = (char*)realloc(c->stack, c->size);
+    }
+    ret = c->stack + c->top;
+    c->top += size;
+    return ret;
+}
+```
+
+### 习题回顾
+
+1. Must Break at case ch=='\', otherwise will go in default.
+2. 错误时让 `c->top = head;`，相当于让栈回到最开始的地方
+3. 范围的确定，需要看说明
 
 ## Tutorial 04
 

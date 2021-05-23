@@ -213,6 +213,16 @@ static void* lept_context_push(lept_context* c, size_t size) {
 
 ## Tutorial 04
 
+### UTF-8 流行的原因
+
+1. 它采用字节为编码单元，不会有字节序（endianness）的问题。
+2. 每个 ASCII 字符只需一个字节去储存。
+3. 如果程序原来是以字节方式储存字符，理论上不需要特别改动就能处理 UTF-8 的数据。
+
+### 习题回顾
+
+第一次因为经过移位操作后，前导都会变为0，因此使用 0xFF 和 0x7F 没有区别。
+
 ## Tutorial 05
 
 ## Tutorial 06

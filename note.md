@@ -101,6 +101,10 @@ assert(x++ == 0); /* 这是错误的! */
 
 ## Tutorial 03
 
+### 注释的写法
+
+`/* \TODO */`
+
 ## Tutorial 04
 
 ## Tutorial 05
